@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Pilotage Veau</title>
+</head>
+<body>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,400..900&family=JetBrains+Mono:wght@400;600&family=Public+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="styles.css">
+<noscript>Cette application nécessite JavaScript.</noscript>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="data.js"></script>
+<script src="icons.js"></script>
+<script src="core.js"></script>
+<script src="views.js"></script>
+<script src="infra.js"></script>
+<script>
+(function boot(){
+ if(ME){renderShell();route()}else gate();
+ initStore();
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();tipHide()}});
+})();
+</script>
+</body>
+</html>
