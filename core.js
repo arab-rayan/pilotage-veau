@@ -78,17 +78,21 @@ function localStoreInit(){
 
 /* ===================== Identité ===================== */
 let ME=ls.get('veau-me',null);
+let GATE_ENTER=null;
+function renderGate(){const box=$('#whoGrid');if(!box||!GATE_ENTER)return;
+ const sig=JSON.stringify(members().map(m=>[m.id,m.name,m.role,m.color]));if(box.dataset.sig===sig)return;box.dataset.sig=sig;
+ box.innerHTML=members().map(m=>`<button class="who-btn" data-id="${m.id}">${avatar(m.name,m.color,'lg')}<span><b>${esc(m.name)}</b><small>${esc(m.role)}</small></span></button>`).join('');
+ $$('.who-btn',box).forEach(b=>b.onclick=()=>{const m=members().find(x=>x.id===b.dataset.id);GATE_ENTER({name:m.name,id:m.id,color:m.color})})}
+function syncMe(){if(!ME?.id)return;const m=members().find(x=>x.id===ME.id);if(m&&(m.name!==ME.name||m.color!==ME.color)){ME={...ME,name:m.name,color:m.color};ls.set('veau-me',ME)}}
 function gate(){
  const g=document.createElement('div');g.className='gate';g.id='gate';
  g.innerHTML=`<div class="gate-card"><div class="row" style="gap:12px"><div class="brand-mark">${icon('mairie',30)}</div><div><div class="eyebrow" style="color:#9fb0dd">BTS SIO SISR · Projet AP</div><h1>Pilotage Veau</h1></div></div>
- <p>Espace de travail du groupe : tâches, planning, cartographie de l'infrastructure, documents Drive, décisions et révision de l'oral. Indique qui tu es pour que tes modifications apparaissent à ton nom.</p>
- <div class="who-grid">${members().map(m=>`<button class="who-btn" data-id="${m.id}">${avatar(m.name,m.color,'lg')}<span><b>${esc(m.name)}</b><small>${esc(m.role)}</small></span></button>`).join('')}</div>
- <form id="gateForm" class="row" style="flex-wrap:nowrap"><input id="gateName" placeholder="Ou écris ton prénom…" autocomplete="name"><button class="btn primary" type="submit">Entrer</button></form>
- <p class="tiny" style="margin-top:14px">Tout le monde peut consulter. Pour modifier, il faut être invité comme éditeur sur l'artefact.</p></div>`;
+ <p>Espace de travail du groupe : tâches, planning, cartographie de l'infrastructure, documents Drive, décisions et révision de l'oral. Clique sur ton nom pour que tes modifications apparaissent à ton nom.</p>
+ <div class="who-grid" id="whoGrid"></div>
+ <p class="tiny" style="margin-top:14px">Tout le monde peut consulter et modifier. Les changements sont visibles en direct par tout le groupe.</p></div>`;
  document.body.appendChild(g);
  const enter=(m)=>{ME=m;ls.set('veau-me',m);g.style.transition='opacity .35s';g.style.opacity='0';setTimeout(()=>g.remove(),350);renderShell();route();if(!ls.get('veau-seen-'+slug(m.name),0))ls.set('veau-seen-'+slug(m.name),Date.now()-7*864e5)};
- $$('.who-btn',g).forEach(b=>b.onclick=()=>{const m=members().find(x=>x.id===b.dataset.id);enter({name:m.name,id:m.id,color:m.color})});
- $('#gateForm',g).onsubmit=e=>{e.preventDefault();const n=$('#gateName').value.trim();if(!n)return;const m=members().find(x=>norm(x.name)===norm(n));enter(m?{name:m.name,id:m.id,color:m.color}:{name:n,id:'x-'+slug(n),color:colorOf(n)})};
+ GATE_ENTER=enter;renderGate();
 }
 
 /* ===================== Notifications ===================== */
@@ -142,7 +146,7 @@ function route(){if(typeof tipHide==='function')tipHide();const h=(location.hash
  const c=$('#crumb');if(c)c.textContent=NAV.find(n=>n[0]===CUR)?.[1]||'';$('.content')?.classList.toggle('full',CUR==='infra');
  const v=$('#view');if(!v)return;v.classList.remove('view');void v.offsetWidth;v.classList.add('view');renderView();window.scrollTo({top:0})}
 function renderView(){const v=$('#view');if(!v||!ME)return;try{VIEWS[CUR]()}catch(e){console.error(e);v.innerHTML=`<div class="empty">Erreur d'affichage : ${esc(e.message)}</div>`}}
-function scheduleRender(){if(renderPending)return;renderPending=true;requestAnimationFrame(()=>{renderPending=false;
+function scheduleRender(){if(renderPending)return;renderPending=true;requestAnimationFrame(()=>{renderPending=false;syncMe();renderGate();
  const a=document.activeElement;if(a&&$('#view')?.contains(a)&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)){deferRender=true;return}
  if(typeof INFRA_BUSY!=='undefined'&&INFRA_BUSY())return;
  updateShellBits();renderView()})}
