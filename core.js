@@ -17,7 +17,7 @@ const clone=o=>JSON.parse(JSON.stringify(o??null));
 /* ===================== Données partagées ===================== */
 const COLS=['tasks','docs','decisions','chk','sites','meta','qq','events','activity','progress','questions','fr'];
 const D={};COLS.forEach(c=>D[c]=new Map());
-let DBH=null,LIVE=false,FIRST=new Set(),BOOT=Date.now(),LOCAL=false;
+let FIRE=false,DBH=null,LIVE=false,FIRST=new Set(),BOOT=Date.now(),LOCAL=false;
 const arr=c=>[...D[c].values()];
 const members=()=>D.meta.get('members')?.list||DEFAULT_MEMBERS;
 const member=id=>id==='all'?{id:'all',name:'Tout le groupe',color:'#64748b',role:''}:(members().find(m=>m.id===id)||{id:'',name:'Non attribué',color:'#94a3b8',role:''});
@@ -27,9 +27,11 @@ const who=id=>{const m=member(id);return `<span class="who">${avatar(m.name,m.co
 const colorOf=name=>{const m=members().find(x=>x.name===name);if(m)return m.color;let h=0;for(const c of name||'')h=(h*31+c.charCodeAt(0))%360;return `hsl(${h} 55% 48%)`};
 
 async function initStore(){
- try{if(window.claude&&claude.use)DBH=await claude.use('db')}catch(e){DBH=null}
+ try{if(window.FIREBASE_CONFIG&&window.firebase){if(!firebase.apps.length)firebase.initializeApp(window.FIREBASE_CONFIG);DBH=firebase.firestore();try{DBH.settings({experimentalForceLongPolling:true,merge:true})}catch(e){}FIRE=true}
+  else if(window.claude&&claude.use)DBH=await claude.use('db')}catch(e){console.error(e);DBH=null}
  if(!DBH){LOCAL=true;localStoreInit()}
  COLS.forEach(subscribe);
+ if(FIRE)seedFirestoreIfEmpty();
  setTimeout(()=>{if(!LIVE){setLive(false);toast('La base partagée ne répond pas encore. Les données affichées peuvent être incomplètes.','bad')}},10000);
 }
 function subscribe(col){
@@ -43,7 +45,7 @@ function subscribe(col){
  },err=>{setLive(false);toast('Connexion à la base interrompue ('+(err?.code||'erreur')+'). Recharge la page.','bad')});
 }
 function ref(col){return DBH?DBH.collection(col):LS.collection(col)}
-function setLive(v){LIVE=v||LIVE;const el=$('#live');if(el){el.className='live'+(LIVE?'':' off');el.querySelector('span').textContent=LOCAL?'Enregistré dans ce navigateur':LIVE?'Synchronisé':'Connexion…'}}
+function setLive(v){LIVE=v||LIVE;const el=$('#live');if(el){el.className='live'+(LIVE?'':' off');el.querySelector('span').textContent=LOCAL?'Enregistré dans ce navigateur (non partagé)':LIVE?'Synchronisé en direct':'Connexion…'}}
 async function put(col,id,data,act){
  data={...data,updatedAt:Date.now(),updatedBy:ME?.name||'?'};
  D[col].set(id,{id,...clone(data)});scheduleRender();
@@ -52,7 +54,7 @@ async function put(col,id,data,act){
 }
 async function del(col,id,act){D[col].delete(id);scheduleRender();try{await ref(col).doc(id).delete();if(act)logAct(...act)}catch(e){deny(e)}}
 function stripId(o){const c=clone(o);delete c.id;return c}
-function deny(e){const c=e?.code||'';toast(c==='permission_denied'||c==='not_granted'||c==='invalid_argument'?'Modification refusée : tu n\'as pas les droits d\'écriture. Demande à Rayan de t\'inviter comme éditeur.':'Échec de l\'enregistrement ('+(c||e?.message||'erreur')+').','bad')}
+function deny(e){const c=e?.code||'';toast(c==='permission_denied'||c==='permission-denied'||c==='not_granted'||c==='invalid_argument'?'Modification refusée : tu n\'as pas les droits d\'écriture. Demande à Rayan de t\'inviter comme éditeur.':'Échec de l\'enregistrement ('+(c||e?.message||'erreur')+').','bad')}
 async function logAct(verb,label,route){
  try{await ref('activity').add({who:ME?.name||'?',color:ME?.color||'',verb,label,route:route||'',ts:Date.now()});
   const all=arr('activity').sort((a,b)=>a.ts-b.ts);if(all.length>180)for(const a of all.slice(0,all.length-160))ref('activity').doc(a.id).delete().catch(()=>{})}catch(e){}
@@ -180,3 +182,9 @@ const stChip=v=>({todo:'',doing:'acc',review:'warn',fix:'bad',done:'ok',validate
 const memberOpts=()=>[{v:'',l:'— Non attribué'},...members().map(m=>({v:m.id,l:m.name+' — '+m.role})),{v:'all',l:'Tout le groupe'}];
 const reqLinks=s=>esc(s).replace(/EX-\d\d/g,m=>`<a href="#projet" onclick="HL='${m}';PJ.tab='exigences'">${m}</a>`).replace(/D-\d{3}/g,m=>`<a href="#projet" onclick="HL='${m}';PJ.tab='decisions'">${m}</a>`);
 let HL=null;
+
+/* Remplit Firestore avec les données de départ au tout premier lancement */
+async function seedFirestoreIfEmpty(){try{const m=await DBH.collection('meta').limit(1).get();if(!m.empty)return;
+ const seed=await (await fetch('seed.json')).json();let b=DBH.batch(),n=0;
+ for(const [col,docs] of Object.entries(seed))for(const [id,data] of Object.entries(docs)){b.set(DBH.collection(col).doc(id),data);if(++n%400===0){await b.commit();b=DBH.batch()}}
+ await b.commit();toast('Base partagée initialisée avec les données de départ.')}catch(e){console.error(e);toast('Impossible d\'initialiser la base Firebase ('+(e.code||e.message)+'). Vérifie config.js et les règles Firestore.','bad')}}

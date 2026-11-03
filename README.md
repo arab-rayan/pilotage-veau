@@ -8,13 +8,27 @@ Application de pilotage du projet SI de la Mairie de Veau (BTS SIO SISR) : tâch
 2. Dans le dépôt : **Settings › Pages › Build and deployment › Source : Deploy from a branch**, branche `main`, dossier `/ (root)`, puis **Save**.
 3. Après 1 à 2 minutes, le site est en ligne à `https://<ton-pseudo>.github.io/pilotage-veau/`.
 
-## Important : où sont enregistrées les données
+## Partage en direct entre les membres (Firebase, gratuit, 5 minutes)
 
-Sur GitHub Pages, il n'y a pas de base de données partagée : chaque navigateur garde **sa propre copie** des données (au départ, celles de `seed.json`).
-Les modifications d'un membre **ne sont pas visibles** par les autres.
+Sans configuration, chaque navigateur garde sa propre copie : les autres ne voient pas tes changements.
+Pour que tout le monde voie les modifications **en direct** (tâches, prénoms, schéma…), branche une base Firebase :
 
-- Pour travailler à plusieurs en direct, utilisez la version hébergée sur claude.ai (bouton Partager, rôle Éditeur).
-- Pour transmettre ses données : rubrique **Équipe › Télécharger une sauvegarde**.
+1. Va sur https://console.firebase.google.com › **Ajouter un projet** (nom : `pilotage-veau`, Google Analytics désactivé).
+2. Menu **Créer › Firestore Database › Créer une base de données** : emplacement `europe-west9 (Paris)`, **mode production**.
+3. Onglet **Règles** de Firestore, remplace tout par ceci puis **Publier** :
+   ```
+   rules_version = '2';
+   service cloud.firestore {
+     match /databases/{database}/documents {
+       match /{document=**} { allow read, write: if true; }
+     }
+   }
+   ```
+4. **Paramètres du projet** (roue dentée) › **Vos applications** › icône **</>** › nom `web` › **Enregistrer**. Copie l'objet `firebaseConfig`.
+5. Colle-le dans `config.js` à la place de `null`, puis pousse sur GitHub.
+6. Au premier lancement, la base se remplit toute seule avec les données de départ. En bas à gauche, l'état passe à « Synchronisé en direct ».
+
+⚠️ Avec ces règles, toute personne qui a le lien du site peut lire et modifier les données. C'est suffisant pour un projet de classe, mais n'y mets rien de confidentiel.
 
 ## Fichiers
 
@@ -24,6 +38,7 @@ Les modifications d'un membre **ne sont pas visibles** par les autres.
 | `styles.css` | Apparence |
 | `data.js` | Exigences du CDC, feuille de route, questions de révision, catalogue d'équipements |
 | `icons.js` | Illustrations des équipements |
+| `config.js` | Configuration Firebase (à remplir pour le partage en direct) |
 | `core.js` | Données, identité, notifications, navigation |
 | `views.js` | Accueil, tâches, documents, projet, feuille de route, révision, équipe |
 | `infra.js` | Topologie, plan, vue 3D, baie, tableaux, exports PDF/PNG/SVG |
